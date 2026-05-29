@@ -632,18 +632,45 @@ let musicEnabled = true;
 let musicStarted = false;
 let playerReady = false;
 
-// Map a 0..100 slider value to Tone's master volume in decibels.
+// The midi-player's SoundFont output does NOT pass through Tone's master
+// volume, so changing the master gain has no audible effect. Instead we give
+// the player its own dedicated volume node and route its output through it,
+// then drive that node's gain from the slider.
+let musicVol = null;
+
+function ensureMusicVol() {
+  if (musicVol) return musicVol;
+  if (typeof Tone === 'undefined') {
+    console.warn('[music] Tone not available yet — volume node deferred');
+    return null;
+  }
+  try {
+    musicVol = new Tone.Volume(0);
+    musicVol.toDestination();
+  } catch (e) {
+    console.warn('[music] could not create volume node:', e);
+    musicVol = null;
+  }
+  return musicVol;
+}
+
+// Point the player's audio output at our volume node. The SoundFont player
+// reads its `output` per note, so this takes effect on subsequent notes.
+function routePlayerThroughVolume() {
+  const v = ensureMusicVol();
+  if (v && midiPlayer && midiPlayer.player) {
+    midiPlayer.player.output = v;
+  }
+}
+
+// Map a 0..100 slider value to decibels on the dedicated node.
 // 100% -> 0 dB (unchanged), lower values fall off logarithmically, 0% -> muted.
 function setMusicVolume(percent) {
   const p = Math.max(0, Math.min(100, Number(percent))) / 100;
-  if (typeof Tone === 'undefined') {
-    console.warn('[music] Tone not available yet — volume change deferred');
-    return;
-  }
-  const dest = (typeof Tone.getDestination === 'function') ? Tone.getDestination() : Tone.Destination;
-  if (!dest || !dest.volume) return;
-  dest.volume.value = (p <= 0) ? -Infinity : 20 * Math.log10(p);
-  console.log('[music] volume set to', Math.round(p * 100) + '% (' + dest.volume.value + ' dB)');
+  const v = ensureMusicVol();
+  if (!v) return;
+  v.volume.value = (p <= 0) ? -Infinity : 20 * Math.log10(p);
+  console.log('[music] volume set to', Math.round(p * 100) + '% (' + v.volume.value + ' dB)');
 }
 
 if (volumeSlider) {
@@ -657,6 +684,8 @@ console.log('[music] init — player el:', midiPlayer, ' btn el:', musicBtn);
 if (midiPlayer) {
   midiPlayer.addEventListener('load', () => {
     playerReady = true;
+    routePlayerThroughVolume();
+    if (volumeSlider) setMusicVolume(volumeSlider.value);
     console.log('[music] player loaded — ready to play');
   });
   midiPlayer.addEventListener('start', () => console.log('[music] playback started'));
@@ -673,6 +702,7 @@ function safeStart() {
     return false;
   }
   try {
+    routePlayerThroughVolume();
     midiPlayer.start();
     return true;
   } catch (e) {
