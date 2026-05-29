@@ -2,6 +2,9 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const logEl = document.getElementById('log');
+const statsEl = document.getElementById('stats');
+
+let hoveredUnit = null;
 
 const GRID_W = 10, GRID_H = 10;
 const TILE_W = 64, TILE_H = 32;
@@ -246,10 +249,37 @@ function render() {
   if (projectile) drawProjectile(projectile);
 
   let s = `Turn: ${TEAMS[currentTeam].name}   Mode: ${mode}`;
-  if (selected) s += `   Selected: ${selected.cls} (HP ${selected.hp}/${selected.maxHp}, Mv ${selected.move}, Atk ${selected.atk}, Rng ${selected.atkRange})`;
   const remain = units.filter(u => u.team === currentTeam && !acted.has(u.id)).length;
   s += `   Units left this turn: ${remain}`;
   statusEl.textContent = s;
+
+  updateStats();
+}
+
+function updateStats() {
+  const u = hoveredUnit || selected;
+  if (!u) {
+    statsEl.innerHTML = '<div class="stats-empty">Hover over or select a unit to see its stats.</div>';
+    return;
+  }
+  const hpPct = Math.max(0, u.hp / u.maxHp);
+  const hpFill = hpPct > 0.4 ? '#4f4' : (hpPct > 0.2 ? '#fc4' : '#f44');
+  const actedLine = acted.has(u.id) ? '<div class="stats-acted">Has acted this turn</div>' : '';
+  const sourceLabel = hoveredUnit ? 'Hovered' : 'Selected';
+  statsEl.innerHTML = `
+    <div class="stats-header">${u.cls}</div>
+    <div class="stats-team" style="background:${TEAMS[u.team].color};">${TEAMS[u.team].name} Team</div>
+    <div class="stats-row"><span class="stats-label">HP</span><span class="stats-value">${u.hp} / ${u.maxHp}</span></div>
+    <div class="stats-hpbar"><div class="stats-hpbar-fill" style="width:${hpPct * 100}%; background:${hpFill};"></div></div>
+    <div class="stats-row"><span class="stats-label">Move</span><span class="stats-value">${u.move}</span></div>
+    <div class="stats-row"><span class="stats-label">Attack</span><span class="stats-value">${u.atk}</span></div>
+    <div class="stats-row"><span class="stats-label">Range</span><span class="stats-value">${u.atkRange}</span></div>
+    <div class="stats-row"><span class="stats-label">Evade</span><span class="stats-value">${Math.round((u.evade || 0) * 100)}%</span></div>
+    <div class="stats-row"><span class="stats-label">Crit</span><span class="stats-value">${Math.round((u.crit || 0) * 100)}%</span></div>
+    <div class="stats-row"><span class="stats-label">Position</span><span class="stats-value">(${u.x}, ${u.y})</span></div>
+    ${actedLine}
+    <div class="stats-source">${sourceLabel}</div>
+  `;
 }
 
 function drawProjectile(p) {
@@ -410,6 +440,25 @@ canvas.addEventListener('contextmenu', e => {
   if (projectile) return;
   cancelSelection();
   render();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const { x, y } = screenToIso(sx, sy);
+  const u = (x >= 0 && y >= 0 && x < GRID_W && y < GRID_H) ? unitAt(x, y) : null;
+  if (u !== hoveredUnit) {
+    hoveredUnit = u;
+    updateStats();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (hoveredUnit) {
+    hoveredUnit = null;
+    updateStats();
+  }
 });
 
 canvas.addEventListener('click', (e) => {
