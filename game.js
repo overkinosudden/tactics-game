@@ -2,9 +2,10 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const logEl = document.getElementById('log');
-const statsEl = document.getElementById('stats');
 
 let hoveredUnit = null;
+
+const PANEL = { x: 820, y: 30, w: 220, h: 500 };
 
 const GRID_W = 10, GRID_H = 10;
 const TILE_W = 64, TILE_H = 32;
@@ -248,38 +249,140 @@ function render() {
 
   if (projectile) drawProjectile(projectile);
 
+  drawStatsPanel();
+
   let s = `Turn: ${TEAMS[currentTeam].name}   Mode: ${mode}`;
   const remain = units.filter(u => u.team === currentTeam && !acted.has(u.id)).length;
   s += `   Units left this turn: ${remain}`;
   statusEl.textContent = s;
-
-  updateStats();
 }
 
-function updateStats() {
+function drawStatsPanel() {
   const u = hoveredUnit || selected;
+  const { x: px, y: py, w: pw, h: ph } = PANEL;
+
+  // translucent panel background
+  ctx.fillStyle = 'rgba(8, 8, 16, 0.72)';
+  ctx.fillRect(px, py, pw, ph);
+
+  // border (team-colored when a unit is shown, neutral otherwise)
+  ctx.strokeStyle = u ? TEAMS[u.team].color : '#444';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(px + 1, py + 1, pw - 2, ph - 2);
+
+  // title bar
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.fillRect(px + 2, py + 2, pw - 4, 28);
+
   if (!u) {
-    statsEl.innerHTML = '<div class="stats-empty">Hover over or select a unit to see its stats.</div>';
+    ctx.fillStyle = '#888';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('UNIT INFO', px + pw / 2, py + 20);
+    ctx.fillStyle = '#666';
+    ctx.font = 'italic 12px system-ui';
+    ctx.fillText('Hover or select', px + pw / 2, py + ph / 2 - 6);
+    ctx.fillText('a unit to view stats', px + pw / 2, py + ph / 2 + 12);
     return;
   }
+
+  // header label (HOVER / SELECTED)
+  ctx.fillStyle = '#999';
+  ctx.font = 'bold 10px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText(hoveredUnit ? 'HOVERING' : 'SELECTED', px + 12, py + 20);
+
+  // team badge (top-right of title bar)
+  const teamText = TEAMS[u.team].name.toUpperCase();
+  ctx.font = 'bold 10px system-ui';
+  const tw = ctx.measureText(teamText).width + 12;
+  ctx.fillStyle = TEAMS[u.team].color;
+  ctx.fillRect(px + pw - tw - 12, py + 8, tw, 16);
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.fillText(teamText, px + pw - tw / 2 - 12, py + 19);
+
+  let cy = py + 50;
+
+  // class name
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 22px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText(u.cls, px + 14, cy);
+  cy += 18;
+
+  // sprite portrait if available
+  const sprite = SPRITES[u.cls] && SPRITES[u.cls][u.team];
+  if (sprite) {
+    const portraitSize = 72;
+    const portraitX = px + pw - portraitSize - 12;
+    const portraitY = cy - 12;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillRect(portraitX, portraitY, portraitSize, portraitSize);
+    ctx.strokeStyle = TEAMS[u.team].color + '88';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(portraitX + 0.5, portraitY + 0.5, portraitSize - 1, portraitSize - 1);
+    ctx.drawImage(sprite, portraitX + 4, portraitY + 4, portraitSize - 8, portraitSize - 8);
+  }
+
+  cy += 16;
+
+  // HP label + numbers
+  ctx.fillStyle = '#aaa';
+  ctx.font = '12px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText('HP', px + 14, cy);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${u.hp} / ${u.maxHp}`, px + pw - 14, cy);
+  cy += 6;
+
+  // HP bar
+  const barX = px + 14, barW = pw - 28;
+  ctx.fillStyle = 'rgba(80, 0, 0, 0.8)';
+  ctx.fillRect(barX, cy, barW, 8);
   const hpPct = Math.max(0, u.hp / u.maxHp);
-  const hpFill = hpPct > 0.4 ? '#4f4' : (hpPct > 0.2 ? '#fc4' : '#f44');
-  const actedLine = acted.has(u.id) ? '<div class="stats-acted">Has acted this turn</div>' : '';
-  const sourceLabel = hoveredUnit ? 'Hovered' : 'Selected';
-  statsEl.innerHTML = `
-    <div class="stats-header">${u.cls}</div>
-    <div class="stats-team" style="background:${TEAMS[u.team].color};">${TEAMS[u.team].name} Team</div>
-    <div class="stats-row"><span class="stats-label">HP</span><span class="stats-value">${u.hp} / ${u.maxHp}</span></div>
-    <div class="stats-hpbar"><div class="stats-hpbar-fill" style="width:${hpPct * 100}%; background:${hpFill};"></div></div>
-    <div class="stats-row"><span class="stats-label">Move</span><span class="stats-value">${u.move}</span></div>
-    <div class="stats-row"><span class="stats-label">Attack</span><span class="stats-value">${u.atk}</span></div>
-    <div class="stats-row"><span class="stats-label">Range</span><span class="stats-value">${u.atkRange}</span></div>
-    <div class="stats-row"><span class="stats-label">Evade</span><span class="stats-value">${Math.round((u.evade || 0) * 100)}%</span></div>
-    <div class="stats-row"><span class="stats-label">Crit</span><span class="stats-value">${Math.round((u.crit || 0) * 100)}%</span></div>
-    <div class="stats-row"><span class="stats-label">Position</span><span class="stats-value">(${u.x}, ${u.y})</span></div>
-    ${actedLine}
-    <div class="stats-source">${sourceLabel}</div>
-  `;
+  const hpColor = hpPct > 0.4 ? '#4f4' : (hpPct > 0.2 ? '#fc4' : '#f44');
+  ctx.fillStyle = hpColor;
+  ctx.fillRect(barX, cy, barW * hpPct, 8);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(barX + 0.5, cy + 0.5, barW - 1, 7);
+  cy += 24;
+
+  // stat rows
+  const rows = [
+    ['Move', u.move],
+    ['Attack', u.atk],
+    ['Range', u.atkRange],
+    ['Evade', `${Math.round((u.evade || 0) * 100)}%`],
+    ['Crit', `${Math.round((u.crit || 0) * 100)}%`],
+    ['Position', `(${u.x}, ${u.y})`],
+  ];
+  ctx.font = '12px system-ui';
+  for (const [label, value] of rows) {
+    ctx.fillStyle = '#aaa';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, px + 14, cy);
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'right';
+    ctx.fillText(String(value), px + pw - 14, cy);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + 14, cy + 6);
+    ctx.lineTo(px + pw - 14, cy + 6);
+    ctx.stroke();
+    cy += 22;
+  }
+
+  if (acted.has(u.id)) {
+    cy += 6;
+    ctx.fillStyle = '#fa4';
+    ctx.font = 'italic 11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Has acted this turn', px + pw / 2, cy);
+  }
 }
 
 function drawProjectile(p) {
@@ -450,14 +553,14 @@ canvas.addEventListener('mousemove', (e) => {
   const u = (x >= 0 && y >= 0 && x < GRID_W && y < GRID_H) ? unitAt(x, y) : null;
   if (u !== hoveredUnit) {
     hoveredUnit = u;
-    updateStats();
+    render();
   }
 });
 
 canvas.addEventListener('mouseleave', () => {
   if (hoveredUnit) {
     hoveredUnit = null;
-    updateStats();
+    render();
   }
 });
 

@@ -20,7 +20,7 @@ html, body {
 }
 
 #status {
-  min-width: 560px;
+  min-width: 820px;
   padding: 6px 10px;
   background: #111;
   border: 1px solid #333;
@@ -48,93 +48,6 @@ canvas {
   display: block;
 }
 
-#game-area {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-#stats {
-  width: 220px;
-  min-height: 560px;
-  padding: 12px;
-  background: #111;
-  border: 1px solid #333;
-  border-radius: 4px;
-  font-size: 13px;
-  box-sizing: border-box;
-}
-
-.stats-empty {
-  color: #666;
-  font-style: italic;
-  font-size: 12px;
-}
-
-.stats-header {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 4px;
-}
-
-.stats-team {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 3px;
-  display: inline-block;
-  margin-bottom: 10px;
-  color: #000;
-  font-weight: bold;
-}
-
-.stats-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  border-bottom: 1px solid #222;
-}
-
-.stats-row:last-child {
-  border-bottom: none;
-}
-
-.stats-label {
-  color: #aaa;
-}
-
-.stats-value {
-  color: #fff;
-  font-weight: 500;
-}
-
-.stats-hpbar {
-  height: 8px;
-  background: #400;
-  border-radius: 4px;
-  margin: 4px 0 10px;
-  overflow: hidden;
-  border: 1px solid #222;
-}
-
-.stats-hpbar-fill {
-  height: 100%;
-  transition: width 0.2s;
-}
-
-.stats-acted {
-  color: #fa4;
-  font-size: 11px;
-  margin-top: 8px;
-  font-style: italic;
-}
-
-.stats-source {
-  margin-top: 10px;
-  font-size: 10px;
-  color: #555;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
 
 .hint {
   font-size: 12px;
@@ -145,7 +58,7 @@ canvas {
 }
 
 #log {
-  width: 800px;
+  width: 1060px;
   height: 110px;
   margin-top: 8px;
   padding: 6px 10px;
@@ -155,4 +68,5 @@ canvas {
   font-size: 12px;
   overflow-y: auto;
   white-space: pre-wrap;
+  box-sizing: border-box;
 }
