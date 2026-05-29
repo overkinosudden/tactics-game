@@ -624,4 +624,38 @@ document.getElementById('wait').addEventListener('click', () => {
 });
 document.getElementById('reset').addEventListener('click', init);
 
+// --- music ---
+const midiPlayer = document.getElementById('midiPlayer');
+const musicBtn = document.getElementById('music');
+let musicEnabled = true;
+let musicStarted = false;
+
+function tryStartMusic() {
+  if (!musicEnabled || musicStarted || !midiPlayer) return;
+  try {
+    midiPlayer.start();
+    musicStarted = true;
+  } catch (e) {
+    // browser blocked autoplay — will retry on next interaction
+  }
+}
+
+function toggleMusic() {
+  musicEnabled = !musicEnabled;
+  musicBtn.innerHTML = musicEnabled ? '&#9835; Music: ON' : '&#9835; Music: OFF';
+  if (!midiPlayer) return;
+  if (musicEnabled) {
+    midiPlayer.start();
+    musicStarted = true;
+  } else {
+    midiPlayer.stop();
+    musicStarted = false;
+  }
+}
+
+musicBtn.addEventListener('click', toggleMusic);
+// browsers require a user gesture before audio can start — first click anywhere kicks it off
+document.addEventListener('click', tryStartMusic);
+document.addEventListener('keydown', tryStartMusic);
+
 init();
