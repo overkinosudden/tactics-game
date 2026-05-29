@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Tactics Game POC</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="wrap">
+  <div id="ui">
+    <div id="status">Turn: -</div>
+    <button id="wait">Wait / Skip Action</button>
+    <button id="endTurn">End Turn</button>
+    <button id="reset">Reset</button>
+  </div>
+  <canvas id="canvas" width="800" height="560"></canvas>
+  <div class="hint">
+    Click your unit (yellow outline) &rarr; click a blue tile to move &rarr; click an enemy in red range to attack, or click your unit / Wait to skip. Right-click cancels.
+  </div>
+  <div id="log"></div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
