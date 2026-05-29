@@ -627,9 +627,30 @@ document.getElementById('reset').addEventListener('click', init);
 // --- music ---
 const midiPlayer = document.getElementById('midiPlayer');
 const musicBtn = document.getElementById('music');
+const volumeSlider = document.getElementById('volume');
 let musicEnabled = true;
 let musicStarted = false;
 let playerReady = false;
+
+// Map a 0..100 slider value to Tone's master volume in decibels.
+// 100% -> 0 dB (unchanged), lower values fall off logarithmically, 0% -> muted.
+function setMusicVolume(percent) {
+  const p = Math.max(0, Math.min(100, Number(percent))) / 100;
+  if (typeof Tone === 'undefined') {
+    console.warn('[music] Tone not available yet — volume change deferred');
+    return;
+  }
+  const dest = (typeof Tone.getDestination === 'function') ? Tone.getDestination() : Tone.Destination;
+  if (!dest || !dest.volume) return;
+  dest.volume.value = (p <= 0) ? -Infinity : 20 * Math.log10(p);
+  console.log('[music] volume set to', Math.round(p * 100) + '% (' + dest.volume.value + ' dB)');
+}
+
+if (volumeSlider) {
+  volumeSlider.addEventListener('input', (e) => setMusicVolume(e.target.value));
+  // Apply the quieter default on load (slider starts at 40%).
+  setMusicVolume(volumeSlider.value);
+}
 
 console.log('[music] init — player el:', midiPlayer, ' btn el:', musicBtn);
 

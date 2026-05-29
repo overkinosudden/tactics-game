@@ -14,6 +14,10 @@
     <button id="endTurn">End Turn</button>
     <button id="reset">Reset</button>
     <button id="music">&#9835; Music: ON</button>
+    <label id="volWrap" title="Music volume">
+      <span id="volIcon">&#128266;</span>
+      <input id="volume" type="range" min="0" max="100" value="40" />
+    </label>
   </div>
   <midi-player id="midiPlayer" src="assets/floating_gardens.mid" sound-font loop style="display:none;"></midi-player>
   <canvas id="canvas" width="1060" height="560"></canvas>
