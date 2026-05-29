@@ -629,33 +629,65 @@ const midiPlayer = document.getElementById('midiPlayer');
 const musicBtn = document.getElementById('music');
 let musicEnabled = true;
 let musicStarted = false;
+let playerReady = false;
 
-function tryStartMusic() {
-  if (!musicEnabled || musicStarted || !midiPlayer) return;
+console.log('[music] init — player el:', midiPlayer, ' btn el:', musicBtn);
+
+if (midiPlayer) {
+  midiPlayer.addEventListener('load', () => {
+    playerReady = true;
+    console.log('[music] player loaded — ready to play');
+  });
+  midiPlayer.addEventListener('start', () => console.log('[music] playback started'));
+  midiPlayer.addEventListener('stop', () => console.log('[music] playback stopped'));
+}
+
+function setBtnLabel() {
+  if (musicBtn) musicBtn.textContent = (musicEnabled ? '♫ Music: ON' : '♫ Music: OFF');
+}
+
+function safeStart() {
+  if (!midiPlayer || typeof midiPlayer.start !== 'function') {
+    console.warn('[music] start() unavailable — player not upgraded yet');
+    return false;
+  }
   try {
     midiPlayer.start();
-    musicStarted = true;
+    return true;
   } catch (e) {
-    // browser blocked autoplay — will retry on next interaction
+    console.warn('[music] start() threw:', e);
+    return false;
   }
+}
+
+function safeStop() {
+  if (!midiPlayer || typeof midiPlayer.stop !== 'function') return;
+  try { midiPlayer.stop(); } catch (e) { console.warn('[music] stop() threw:', e); }
+}
+
+function tryStartMusic() {
+  if (!musicEnabled || musicStarted) return;
+  if (safeStart()) musicStarted = true;
 }
 
 function toggleMusic() {
   musicEnabled = !musicEnabled;
-  musicBtn.innerHTML = musicEnabled ? '&#9835; Music: ON' : '&#9835; Music: OFF';
-  if (!midiPlayer) return;
+  setBtnLabel();
+  console.log('[music] toggled — enabled now:', musicEnabled);
   if (musicEnabled) {
-    midiPlayer.start();
-    musicStarted = true;
+    if (safeStart()) musicStarted = true;
   } else {
-    midiPlayer.stop();
+    safeStop();
     musicStarted = false;
   }
 }
 
-musicBtn.addEventListener('click', toggleMusic);
-// browsers require a user gesture before audio can start — first click anywhere kicks it off
+if (musicBtn) {
+  musicBtn.addEventListener('click', toggleMusic);
+  console.log('[music] click handler attached to button');
+}
 document.addEventListener('click', tryStartMusic);
 document.addEventListener('keydown', tryStartMusic);
 
+setBtnLabel();
 init();
