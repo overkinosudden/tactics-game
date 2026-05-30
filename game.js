@@ -192,6 +192,10 @@ function render() {
     const { sx, sy } = isoToScreen(u.x, u.y);
     const cx = sx, cy = sy + TILE_H / 2;
 
+    // hit animation: shake the body (not its shadow/aura) and flash it red
+    const hurt = hurtInfo(u);
+    const bodyX = cx + (hurt ? hurt.shakeX : 0);
+
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.beginPath();
@@ -213,38 +217,46 @@ function render() {
 
     if (sprite) {
       const size = 44;
+      const spx = bodyX - size / 2, spy = cy - size + 12;
       if (dimmed) ctx.globalAlpha = 0.55;
-      ctx.drawImage(sprite, cx - size / 2, cy - size + 12, size, size);
+      ctx.drawImage(sprite, spx, spy, size, size);
       ctx.globalAlpha = 1.0;
+      if (hurt && hurt.flashAlpha > 0) drawHurtFlash(sprite, spx, spy, size, size, hurt.flashAlpha);
     } else {
       ctx.fillStyle = TEAMS[u.team].color;
-      ctx.fillRect(cx - 10, cy - 22, 20, 26);
+      ctx.fillRect(bodyX - 10, cy - 22, 20, 26);
       ctx.strokeStyle = TEAMS[u.team].dark;
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(cx - 10, cy - 22, 20, 26);
+      ctx.strokeRect(bodyX - 10, cy - 22, 20, 26);
       ctx.fillStyle = CLASSES[u.cls].color;
       ctx.beginPath();
-      ctx.arc(cx, cy - 26, 5, 0, Math.PI * 2);
+      ctx.arc(bodyX, cy - 26, 5, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 1;
       ctx.stroke();
       if (dimmed) {
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillRect(cx - 11, cy - 23, 22, 28);
+        ctx.fillRect(bodyX - 11, cy - 23, 22, 28);
+      }
+      if (hurt && hurt.flashAlpha > 0) {
+        ctx.fillStyle = '#ff2a2a';
+        ctx.globalAlpha = hurt.flashAlpha;
+        ctx.fillRect(bodyX - 10, cy - 22, 20, 26);
+        ctx.globalAlpha = 1;
       }
     }
 
     const hpW = 26;
     ctx.fillStyle = '#400';
-    ctx.fillRect(cx - hpW/2, cy + 14, hpW, 4);
+    ctx.fillRect(bodyX - hpW/2, cy + 14, hpW, 4);
     ctx.fillStyle = u.hp / u.maxHp > 0.4 ? '#4f4' : (u.hp / u.maxHp > 0.2 ? '#fc4' : '#f44');
-    ctx.fillRect(cx - hpW/2, cy + 14, hpW * (u.hp / u.maxHp), 4);
+    ctx.fillRect(bodyX - hpW/2, cy + 14, hpW * (u.hp / u.maxHp), 4);
 
     ctx.fillStyle = '#fff';
     ctx.font = '10px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText(u.cls, cx, cy - (sprite ? 36 : 30));
+    ctx.fillText(u.cls, bodyX, cy - (sprite ? 36 : 30));
   }
 
   if (projectile) drawProjectile(projectile);
@@ -466,6 +478,59 @@ function startProjectile(attacker, target, onComplete) {
   requestAnimationFrame(animateProjectile);
 }
 
+// --- damage hit animation (shake + red flash) ---
+const HURT_DURATION = 500; // ms — "turn red for half a second"
+const SHAKE_AMP = 4;       // px of horizontal shake
+const SHAKE_FREQ = 8;      // oscillations across the duration
+
+// Returns the current shake offset / red-flash alpha for a unit, or null.
+function hurtInfo(u) {
+  if (u.hurtStart == null) return null;
+  const e = performance.now() - u.hurtStart;
+  if (e >= HURT_DURATION) return null;
+  const p = e / HURT_DURATION;     // 0..1 over the animation
+  const decay = 1 - p;             // ease the motion/colour out toward the end
+  return {
+    shakeX: Math.sin(p * Math.PI * 2 * SHAKE_FREQ) * SHAKE_AMP * decay,
+    flashAlpha: 0.65 * Math.min(1, decay * 1.6), // hold red, then fade
+  };
+}
+
+// Overlay a red-tinted copy of a sprite (only its opaque pixels) on top.
+const _flashCanvas = document.createElement('canvas');
+const _flashCtx = _flashCanvas.getContext('2d');
+function drawHurtFlash(sprite, dx, dy, w, h, alpha) {
+  _flashCanvas.width = w;
+  _flashCanvas.height = h;
+  _flashCtx.clearRect(0, 0, w, h);
+  _flashCtx.drawImage(sprite, 0, 0, w, h);
+  _flashCtx.globalCompositeOperation = 'source-atop';
+  _flashCtx.fillStyle = '#ff2a2a';
+  _flashCtx.globalAlpha = alpha;
+  _flashCtx.fillRect(0, 0, w, h);
+  _flashCtx.globalAlpha = 1;
+  _flashCtx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(_flashCanvas, dx, dy, w, h);
+}
+
+// Keep re-rendering while any unit is mid hit-animation.
+let hurtAnimRunning = false;
+function ensureHurtAnim() {
+  if (hurtAnimRunning) return;
+  hurtAnimRunning = true;
+  requestAnimationFrame(hurtTick);
+}
+function hurtTick() {
+  const now = performance.now();
+  const active = units.some(u => u.hurtStart != null && now - u.hurtStart < HURT_DURATION);
+  render();
+  if (active) {
+    requestAnimationFrame(hurtTick);
+  } else {
+    hurtAnimRunning = false;
+  }
+}
+
 function resolveAttack(attacker, target) {
   if (Math.random() < (target.evade || 0)) {
     log(`${TEAMS[target.team].name} ${target.cls} evades the attack!`);
@@ -478,6 +543,8 @@ function resolveAttack(attacker, target) {
       critTag = ' (CRIT!)';
     }
     target.hp -= dmg;
+    target.hurtStart = performance.now(); // trigger shake + red flash
+    ensureHurtAnim();
     log(`${attacker.cls} hits ${TEAMS[target.team].name} ${target.cls} for ${dmg}${critTag}.`);
     if (target.hp <= 0) {
       log(`${TEAMS[target.team].name} ${target.cls} is defeated!`);
